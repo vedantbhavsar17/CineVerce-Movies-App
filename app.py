@@ -12,6 +12,14 @@ configure()
 st.set_page_config(page_title='CineVerse',layout='wide')
 
 st.sidebar.title("Explore Fuctions")
+with st.sidebar:
+    st.markdown("---")
+    st.subheader("👨‍💻 About Me")
+    st.write(
+        "Hi, I'm Vedant Bhavsar, the creator of CineVerse 🎬.\n\n"
+        "Check out my projects on GitHub:\n"
+        "[vedantbhavsar17](https://github.com/vedantbhavsar17)"
+    )
 
 BASE_URL = "https://api.themoviedb.org/3"
 IMG_BASE_URL = "https://image.tmdb.org/t/p/w500"

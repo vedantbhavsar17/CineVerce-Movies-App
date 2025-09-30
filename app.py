@@ -11,7 +11,8 @@ configure()
 
 st.set_page_config(page_title='CineVerse',layout='wide')
 
-st.sidebar.title("Explore Fuctions")
+st.sidebar.title("Explore Manu")
+choice = st.sidebar.selectbox("Options", ["Home","By Genre", "trending movies"])
 with st.sidebar:
     st.markdown("---")
     st.subheader("👨‍💻 About Me")
@@ -21,6 +22,7 @@ with st.sidebar:
         "[vedantbhavsar17](https://github.com/vedantbhavsar17)"
     )
 
+API_KEY = st.secrets["API_KEY"]
 BASE_URL = "https://api.themoviedb.org/3"
 IMG_BASE_URL = "https://image.tmdb.org/t/p/w500"
 genres = [{"id":28,"name":"Action"}, {"id":12,"name":"Adventure"}, {"id":16,"name":"Animation"}, {"id":35,"name":"Comedy"}, {"id":80,"name":"Crime"}, {"id":99,"name":"Documentary"}, {"id":18,"name":"Drama"}, {"id":10751,"name":"Family"}, {"id":14,"name":"Fantasy"}, {"id":36,"name":"History"}, {"id":27,"name":"Horror"}, {"id":10402,"name":"Music"}, {"id":9648,"name":"Mystery"}, {"id":10749,"name":"Romance"}, {"id":878,"name":"Science Fiction"}, {"id":10770,"name":"TV Movie"}, {"id":53,"name":"Thriller"}, {"id":10752,"name":"War"}, {"id":37,"name":"Western"}]
@@ -28,7 +30,7 @@ genres = [{"id":28,"name":"Action"}, {"id":12,"name":"Adventure"}, {"id":16,"nam
 def tmdb_search_poster(movie_name):
 
     url = f"{BASE_URL}/search/movie"
-    r = requests.get(url, params={"api_key": str(f"{os.getenv('API_KEY')}"), "query": movie_name}, timeout=10)
+    r = requests.get(url, params={"api_key": API_KEY, "query": movie_name}, timeout=10)
     if r.status_code == 200:
         results = r.json().get("results", [])
         if results:
@@ -128,7 +130,7 @@ def homepage():
 
                         if response[0]['popularity'] is not None:
                             if pd.to_datetime(response[0]['release_date']).normalize() > (pd.Timestamp.now()).normalize():
-                                st.markdown(f"**:orange[Popularity] :** {"Not Released Yet"}")
+                                st.markdown(f"**:orange[Popularity] :** {'Not Released Yet'}")
                             else:
                                 try:
                                     pop_val = float(response[0]['popularity'])
@@ -159,7 +161,7 @@ def fetch_top_by_genre(genre_id, k=20, use_rating=False, min_votes=1000):
     sort_by = "vote_average.desc" if use_rating else "popularity.desc"
     while len(movies) < k:
         params = {
-            "api_key": str(f"{os.getenv('API_KEY')}"),
+            "api_key": API_KEY,
             "language": "en-US",
             "with_genres": genre_id,
             "sort_by": sort_by,
@@ -207,7 +209,7 @@ def topmovies():
     url = f"{BASE_URL}/movie/popular"
     page = 1
     r = requests.get(url, params={
-            "api_key": str(f"{os.getenv('API_KEY')}"),
+            "api_key": API_KEY,
             "language": "en-US",
             "page": page,
     }, timeout=10)
@@ -238,8 +240,6 @@ def trending_movies():
                         )
                 else:
                     st.text(f"{info['title']} (No Poster)")     
-
-choice = st.sidebar.selectbox("Options", ["Home","By Genre", "trending movies"])
 
 if choice == "Home":
     try:

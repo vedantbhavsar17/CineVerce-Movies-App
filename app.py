@@ -1,18 +1,12 @@
 import streamlit as st
 import pandas as pd
 import requests
-from dotenv import load_dotenv
 import os
-
-def configure():
-    load_dotenv()
-
-configure()
 
 st.set_page_config(page_title='CineVerse',layout='wide')
 
 st.sidebar.title("Explore Manu")
-choice = st.sidebar.selectbox("Options", ["Home","By Genre", "trending movies"])
+choice = st.sidebar.selectbox("Options", ["Home", "By Genre", "Trending", "Watch Movie/Tv"])
 with st.sidebar:
     st.markdown("---")
     st.subheader("👨‍💻 About Me")
@@ -25,6 +19,7 @@ with st.sidebar:
 API_KEY = st.secrets["API_KEY"]
 BASE_URL = "https://api.themoviedb.org/3"
 IMG_BASE_URL = "https://image.tmdb.org/t/p/w500"
+BASE_STREAM = st.secrets["MOVIE_BASE"]
 genres = [{"id":28,"name":"Action"}, {"id":12,"name":"Adventure"}, {"id":16,"name":"Animation"}, {"id":35,"name":"Comedy"}, {"id":80,"name":"Crime"}, {"id":99,"name":"Documentary"}, {"id":18,"name":"Drama"}, {"id":10751,"name":"Family"}, {"id":14,"name":"Fantasy"}, {"id":36,"name":"History"}, {"id":27,"name":"Horror"}, {"id":10402,"name":"Music"}, {"id":9648,"name":"Mystery"}, {"id":10749,"name":"Romance"}, {"id":878,"name":"Science Fiction"}, {"id":10770,"name":"TV Movie"}, {"id":53,"name":"Thriller"}, {"id":10752,"name":"War"}, {"id":37,"name":"Western"}]
 
 def tmdb_search_poster(movie_name):
@@ -239,7 +234,129 @@ def trending_movies():
                             unsafe_allow_html=True
                         )
                 else:
-                    st.text(f"{info['title']} (No Poster)")     
+                    st.text(f"{info['title']} (No Poster)")   
+
+def watch_now():
+    st.title("CineVerse")
+    st.markdown(":red[Search Your Fav] :fire:")
+
+    if "watch_data" not in st.session_state:
+        st.session_state.watch_data = None
+    if "play_now" not in st.session_state:
+        st.session_state.play_now = False
+
+    search_query = st.text_input("Search Movie or TV Series", label_visibility="collapsed")
+    search_btn = st.button("Search")
+
+    if search_query and search_btn:
+        url = f"{BASE_URL}/search/multi"
+        r = requests.get(url, params={
+            "api_key": API_KEY,
+            "query": search_query
+        }, timeout=10)
+
+        if r.status_code == 200:
+            results = r.json().get("results", [])
+            results = [x for x in results if x.get("media_type") in ["movie", "tv"]]
+            if results:
+                best = max(results, key=lambda x: x.get("popularity", 0))
+                st.session_state.watch_data = best
+                st.session_state.play_now = False
+            else:
+                st.error("Not Found")
+
+    if st.session_state.watch_data:
+        data = st.session_state.watch_data
+        media_type = data.get("media_type")
+        tmdb_id = data.get("id")
+        poster_path = data.get("poster_path")
+
+        col1, col2 = st.columns([1, 2])
+
+        with col1:
+            if poster_path:
+                st.image(IMG_BASE_URL + poster_path, width=250)
+
+        with col2:
+            if media_type == "movie":
+                st.header(data.get("title", "Unknown Title"))
+                st.markdown("**Type:** Movie")
+                if data.get("release_date"):
+                    st.markdown(f"**Release Date:** {data.get('release_date')}")
+                if data.get("overview"):
+                    st.markdown(f"**Overview:** {data.get('overview')}")
+
+                if st.button("▶ Watch Now"):
+                    st.session_state.play_now = True
+
+                if st.session_state.play_now:
+                    embed_url = f"{BASE_STREAM}/movie/{tmdb_id}?server=1&autoPlay=true"
+                    st.markdown(
+                        f"""
+                        <div style="display:flex; justify-content:center; margin-top:30px;">
+                            <div style="
+                                width:100%;
+                                max-width:1000px;
+                                aspect-ratio:16/9;
+                                border-radius:12px;
+                                overflow:hidden;
+                                box-shadow:0 10px 30px rgba(0,0,0,0.6);
+                            ">
+                                <iframe 
+                                    src="{embed_url}" 
+                                    width="100%" 
+                                    height="100%" 
+                                    frameborder="0"
+                                    allowfullscreen
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                                    style="border:none;"
+                                ></iframe>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            elif media_type == "tv":
+                st.header(data.get("name", "Unknown Series"))
+                if data.get("first_air_date"):
+                    st.markdown(f"**First Air Date:** {data.get('first_air_date')}")
+                if data.get("overview"):
+                    st.markdown(f"**Overview:** {data.get('overview')}")
+
+                season = st.number_input("Season", min_value=1, step=1, value=1)
+                episode = st.number_input("Episode", min_value=1, step=1, value=1)
+
+                if st.button("▶ Watch Episode"):
+                    st.session_state.play_now = True
+
+                if st.session_state.play_now:
+                    embed_url = f"{BASE_STREAM}/tv/{tmdb_id}/{season}/{episode}?autoPlay=true"
+                    st.markdown(
+                        f"""
+                        <div style="display:flex; justify-content:center; margin-top:30px;">
+                            <div style="
+                                width:100%;
+                                max-width:1000px;
+                                aspect-ratio:16/9;
+                                border-radius:12px;
+                                overflow:hidden;
+                                box-shadow:0 10px 30px rgba(0,0,0,0.6);
+                            ">
+                                <iframe 
+                                    src="{embed_url}" 
+                                    width="100%" 
+                                    height="100%" 
+                                    frameborder="0"
+                                    allowfullscreen
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                                    style="border:none;"
+                                ></iframe>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
 if choice == "Home":
     try:
@@ -251,8 +368,13 @@ elif choice == "By Genre":
         Bygenre()
     except Exception as e:
         st.error(f"Network Slow Please Check Your Internet Connection")
-elif choice == "trending movies":
+elif choice == "Trending movies":
     try:
         trending_movies()
+    except Exception as e:
+        st.error(f"Network Slow Please Check Your Internet Connection")
+elif choice == "Watch Movie/Tv":
+    try:
+        watch_now()
     except Exception as e:
         st.error(f"Network Slow Please Check Your Internet Connection")

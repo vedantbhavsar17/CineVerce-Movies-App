@@ -250,14 +250,19 @@ def watch_now():
 
     if search_query and search_btn:
         url = f"{BASE_URL}/search/multi"
-        r = requests.get(url, params={
-            "api_key": API_KEY,
-            "query": search_query
-        }, timeout=10)
+        r = requests.get(
+            url,
+            params={
+                "api_key": API_KEY,
+                "query": search_query
+            },
+            timeout=10
+        )
 
         if r.status_code == 200:
             results = r.json().get("results", [])
             results = [x for x in results if x.get("media_type") in ["movie", "tv"]]
+
             if results:
                 best = max(results, key=lambda x: x.get("popularity", 0))
                 st.session_state.watch_data = best
@@ -278,11 +283,14 @@ def watch_now():
                 st.image(IMG_BASE_URL + poster_path, width=250)
 
         with col2:
+
             if media_type == "movie":
                 st.header(data.get("title", "Unknown Title"))
                 st.markdown("**Type:** Movie")
+
                 if data.get("release_date"):
                     st.markdown(f"**Release Date:** {data.get('release_date')}")
+
                 if data.get("overview"):
                     st.markdown(f"**Overview:** {data.get('overview')}")
 
@@ -290,7 +298,8 @@ def watch_now():
                     st.session_state.play_now = True
 
                 if st.session_state.play_now:
-                    embed_url = f"{BASE_STREAM}/movie/{tmdb_id}?server=1&autoPlay=true"
+                    embed_url = f"{BASE_STREAM}/movie/{tmdb_id}?autoPlay=true"
+
                     st.markdown(
                         f"""
                         <div style="display:flex; justify-content:center; margin-top:30px;">
@@ -319,19 +328,52 @@ def watch_now():
 
             elif media_type == "tv":
                 st.header(data.get("name", "Unknown Series"))
+
                 if data.get("first_air_date"):
                     st.markdown(f"**First Air Date:** {data.get('first_air_date')}")
+
                 if data.get("overview"):
                     st.markdown(f"**Overview:** {data.get('overview')}")
 
-                season = st.number_input("Season", min_value=1, step=1, value=1)
-                episode = st.number_input("Episode", min_value=1, step=1, value=1)
+                tv_details = requests.get(
+                    f"{BASE_URL}/tv/{tmdb_id}",
+                    params={"api_key": API_KEY},
+                    timeout=10
+                )
+
+                if tv_details.status_code == 200:
+                    tv_data = tv_details.json()
+                    total_seasons = tv_data.get("number_of_seasons", 1)
+                else:
+                    total_seasons = 1
+
+                season = st.number_input(
+                    "Season",
+                    min_value=1,
+                    max_value=total_seasons,
+                    step=1,
+                    value=1
+                )
+
+                season_details = requests.get(
+                    f"{BASE_URL}/tv/{tmdb_id}/season/{season}",
+                    params={"api_key": API_KEY},
+                    timeout=10
+                )
+
+                episode = st.number_input(
+                    "Episode",
+                    min_value=1,
+                    step=1,
+                    value=1
+                )
 
                 if st.button("▶ Watch Episode"):
                     st.session_state.play_now = True
 
                 if st.session_state.play_now:
-                    embed_url = f"{BASE_STREAM}/tv/{tmdb_id}/{season}/{episode}?autoPlay=true"
+                    embed_url = f"{BASE_STREAM}/tv/{tmdb_id}/{season}/{episode}?autoPlay=true&nextEpisode=true&episodeSelector=true"
+
                     st.markdown(
                         f"""
                         <div style="display:flex; justify-content:center; margin-top:30px;">
@@ -368,7 +410,7 @@ elif choice == "By Genre":
         Bygenre()
     except Exception as e:
         st.error(f"Network Slow Please Check Your Internet Connection")
-elif choice == "Trending movies":
+elif choice == "Trending":
     try:
         trending_movies()
     except Exception as e:

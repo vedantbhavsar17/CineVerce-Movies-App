@@ -1,5 +1,5 @@
 # 🎬 CineVerse Movies App
-Applicationlike - [CineVerse](https://cineverce.streamlit.app/)
+Applicationlike - [CineVerse](https://cinemaverse.streamlit.app/)
 <br>CineVerse is a **Streamlit-based movie discovery app** powered by the [TMDB API](https://developer.themoviedb.org/).  
 It allows you to **search movies, explore trending films, and browse by genres** with clean poster displays and detailed information.
 

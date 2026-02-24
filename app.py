@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import os
+import re
 
 st.set_page_config(page_title='CineVerse',layout='wide')
 
@@ -21,6 +22,38 @@ BASE_URL = "https://api.themoviedb.org/3"
 IMG_BASE_URL = "https://image.tmdb.org/t/p/w500"
 BASE_STREAM = st.secrets["MOVIE_BASE"]
 genres = [{"id":28,"name":"Action"}, {"id":12,"name":"Adventure"}, {"id":16,"name":"Animation"}, {"id":35,"name":"Comedy"}, {"id":80,"name":"Crime"}, {"id":99,"name":"Documentary"}, {"id":18,"name":"Drama"}, {"id":10751,"name":"Family"}, {"id":14,"name":"Fantasy"}, {"id":36,"name":"History"}, {"id":27,"name":"Horror"}, {"id":10402,"name":"Music"}, {"id":9648,"name":"Mystery"}, {"id":10749,"name":"Romance"}, {"id":878,"name":"Science Fiction"}, {"id":10770,"name":"TV Movie"}, {"id":53,"name":"Thriller"}, {"id":10752,"name":"War"}, {"id":37,"name":"Western"}]
+
+
+def _normalize_title(text):
+    return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
+
+
+def select_best_match(results, query, media_type=None):
+    """Pick the best TMDB result by text relevance first, popularity second."""
+    normalized_query = _normalize_title(query)
+    scored_results = []
+
+    for result in results:
+        if media_type and result.get("media_type") != media_type:
+            continue
+
+        candidate_title = result.get("title") or result.get("name") or ""
+        normalized_candidate = _normalize_title(candidate_title)
+
+        score = 0
+        if normalized_candidate == normalized_query:
+            score += 100
+        elif normalized_query and normalized_candidate.startswith(normalized_query):
+            score += 70
+        elif normalized_query and normalized_query in normalized_candidate:
+            score += 40
+
+        score += min(float(result.get("popularity", 0)), 30)
+        scored_results.append((score, result))
+
+    if not scored_results:
+        return None
+    return max(scored_results, key=lambda item: item[0])[1]
 
 def tmdb_search_poster(movie_name):
 
@@ -48,7 +81,9 @@ def somePapularGanres():
         for j, m in enumerate(movies):
             response = tmdb_search_poster(m['title'])
             if response:
-                best = max(response, key=lambda x: x.get("popularity", 0))
+                best = select_best_match(response, m['title'])
+                if not best:
+                    continue
                 poster_path = best.get("poster_path")
                 if poster_path:
                     path = IMG_BASE_URL + poster_path
@@ -94,41 +129,44 @@ def homepage():
             if movie and search_btn:
                 response = tmdb_search_poster(movie)
                 if response:
-                    best = max(response, key=lambda x: x.get("popularity", 0))
+                    best = select_best_match(response, movie)
+                    if not best:
+                        st.error(f"❌ {movie} not found")
+                        return
                     poster_path = best.get("poster_path")
                     if poster_path:
                         path = IMG_BASE_URL + poster_path
                         st.image(path, width=250)
 
-                        if response[0]['title']:
-                            st.header(response[0]['title'])
+                        if best['title']:
+                            st.header(best['title'])
                         else:
                             st.header(movie)
 
-                        if pd.to_datetime(response[0]['release_date']).normalize() > (pd.Timestamp.now()).normalize():
-                            st.markdown(f":blue-background[Releasing Date] : {response[0]['release_date']}")
+                        if pd.to_datetime(best['release_date']).normalize() > (pd.Timestamp.now()).normalize():
+                            st.markdown(f":blue-background[Releasing Date] : {best['release_date']}")
                         else:
-                            st.markdown(f":blue-background[Release Date] : {response[0]['release_date']}")
+                            st.markdown(f":blue-background[Release Date] : {best['release_date']}")
 
-                        if response[0]['overview']:
-                            st.markdown(f"**:green[Overview]** : {response[0]['overview']}")
+                        if best['overview']:
+                            st.markdown(f"**:green[Overview]** : {best['overview']}")
                         else:
                             st.markdown("**Overview:** _Not available_")
                         
-                        if response[0]['genre_ids']:
+                        if best['genre_ids']:
                             genre_map = {g["id"]: g["name"] for g in genres}
-                            genre_names = [genre_map[g] for g in response[0]['genre_ids'] if g in genre_map]
+                            genre_names = [genre_map[g] for g in best['genre_ids'] if g in genre_map]
                             genre_string = ", ".join(genre_names)
                             st.markdown(f"**:violet[Gener(s)]** {genre_string}")
                         else:
                             st.markdown("**Genre(s):** Not available")
 
-                        if response[0]['popularity'] is not None:
-                            if pd.to_datetime(response[0]['release_date']).normalize() > (pd.Timestamp.now()).normalize():
+                        if best['popularity'] is not None:
+                            if pd.to_datetime(best['release_date']).normalize() > (pd.Timestamp.now()).normalize():
                                 st.markdown(f"**:orange[Popularity] :** {'Not Released Yet'}")
                             else:
                                 try:
-                                    pop_val = float(response[0]['popularity'])
+                                    pop_val = float(best['popularity'])
                                     if pop_val <= 20:
                                         review = "Ok ok"
                                     elif pop_val <= 45:
@@ -139,12 +177,12 @@ def homepage():
                                         review = "Excellent!!!"
                                     st.markdown(f"**:orange[Popularity] :** {pop_val} — **{review}**")
                                 except Exception:
-                                    st.markdown(f"**:orange[Popularity] :** {response[0]['popularity']}")
+                                    st.markdown(f"**:orange[Popularity] :** {best['popularity']}")
                         else:
                             st.markdown("**Popularity:** _Not available_")
 
-                        if response[0]['original_language']:
-                            st.markdown(f"**:gray[Language] :** {response[0]['original_language']}")
+                        if best['original_language']:
+                            st.markdown(f"**:gray[Language] :** {best['original_language']}")
                         else:
                             st.markdown("**Language:** _Not available_")
                 else:
@@ -264,7 +302,7 @@ def watch_now():
             results = [x for x in results if x.get("media_type") in ["movie", "tv"]]
 
             if results:
-                best = max(results, key=lambda x: x.get("popularity", 0))
+                best = select_best_match(results, search_query)
                 st.session_state.watch_data = best
                 st.session_state.play_now = False
             else:
